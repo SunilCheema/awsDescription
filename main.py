@@ -26,7 +26,8 @@ def lambda_handler(event, context):
     #sorts the dataframe according to the instance type column
     dataframe = dataframe[cols]
     dataframe = dataframe.sort_values(by=['Instance Type'])
-
+    #dataframe = dataframe.drop([0, 1,7,8,9,14,15,16,17,24,25,26,27,35])
+    
     #Exports the dataframe as a csv file
     dataframe.to_csv('/tmp/out.csv', index = False)
     #print(dataframe.head())
