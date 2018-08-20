@@ -6,48 +6,79 @@ import requests
 import urllib
 import os
 import csv
+import pickle
 
-print('Loading function')
 
+def lambda_handler():
 
-def lambda_handler(event, context):
-    #print("Received event: " + json.dumps(event, indent=2))
     download_file('https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-west-1/index.csv')
-
-    createNewFile()
-
+    removeRows()
     dataframe = pd.read_csv('/tmp/updated_test.csv')
+    dataframe = swapColumns(dataframe)
+    dataframe = sortByInstanceType(dataframe)
+    dataframe = removeColumns(dataframe)
+    dataframe = removeData(dataframe)
+    dataframe = removeMoreColumns(dataframe)
+    dataframe.to_csv('/tmp/outNew.csv', index=False)
 
-    #swaps the column positions to put instance type first
-    cols = dataframe.columns.tolist()
-    a, b = cols.index('SKU'), cols.index('Instance Type')
-    cols[b], cols[a] = cols[a], cols[b]
 
-    #sorts the dataframe according to the instance type column
-    dataframe = dataframe[cols]
-    dataframe = dataframe.sort_values(by=['Instance Type'])
-    #dataframe = dataframe.drop([0, 1,7,8,9,14,15,16,17,24,25,26,27,35])
-    
-    #Exports the dataframe as a csv file
-    dataframe.to_csv('/tmp/out.csv', index = False)
-    #print(dataframe.head())
-    afile = open('/tmp/out.csv', 'r+')
-    csvReader1 = csv.reader(afile)
-    for i in range(2):
-        print(csvReader1.next())
-    return ' '  # Echo back the first key value
-    #raise Exception('Something went wrong')
+    return ' '
+
 
 def download_file(url):
     fullfilename = os.path.join('/tmp', 'index.csv')
     urllib.urlretrieve(url, fullfilename)
 
+
 # Removes first 5 rows of the csv file
-def createNewFile():
+def removeRows():
     with open("/tmp/index.csv", 'r') as f:
         with open("/tmp/updated_test.csv", 'w') as f1:
             for i in range(5):
                 f.next()
-                
+
             for line in f:
                 f1.write(line)
+
+
+def swapColumns(dataframe):
+    cols = dataframe.columns.tolist()
+    print(cols)
+    a, b = cols.index('SKU'), cols.index('Instance Type')
+    cols[b], cols[a] = cols[a], cols[b]
+    dataframe = dataframe[cols]
+    return dataframe
+
+def sortByInstanceType(dataframe):
+    dataframe = dataframe.sort_values(by=['Instance Type'])
+
+    return dataframe
+
+def storeFile():
+    url = 'https://file.io/?expires=1w'
+    files = {'file': open('/tmp/out.csv', 'rb')}
+    r = requests.post(url, files=files)
+
+    # retrieve link
+    d = json.loads(r.content)
+    link = d['link']
+
+    print(link)
+
+def removeColumns(dataframe):
+    dataframe = dataframe.drop(['SKU', 'OfferTermCode', 'RateCode', 'EffectiveDate', 'StartingRange', 'EndingRange', 'LeaseContractLength', 'PurchaseOption', 'OfferingClass', 'Product Family', 'serviceCode', 'Location Type', 'Current Generation', 'Instance Family', 'Physical Processor', 'Clock Speed', 'Storage Media', 'Volume Type', 'Max Volume Size', 'Max IOPS/volume', 'Max IOPS Burst Performance', 'Max throughput/volume', 'Provisioned', 'EBS Optimized', 'Group', 'Group Description', 'Transfer Type', 'From Location', 'From Location Type', 'To Location', 'To Location Type', 'usageType', 'operation', 'CapacityStatus', 'Dedicated EBS Throughput', 'ECU', 'Elastic GPU Type', 'Enhanced Networking Supported', 'GPU', 'GPU Memory', 'Instance', 'Instance Capacity - 10xlarge', 'Instance Capacity - 12xlarge', 'Instance Capacity - 16xlarge', 'Instance Capacity - 18xlarge', 'Instance Capacity - 24xlarge', 'Instance Capacity - 2xlarge', 'Instance Capacity - 32xlarge', 'Instance Capacity - 4xlarge', 'Instance Capacity - 8xlarge', 'Instance Capacity - 9xlarge', 'Instance Capacity - large', 'Instance Capacity - medium', 'Instance Capacity - xlarge', 'Intel AVX Available', 'Intel AVX2 Available', 'Intel Turbo Available', 'Normalization Size Factor', 'Physical Cores', 'Processor Features', 'serviceName'], axis=1)
+    return dataframe
+
+def removeData(dataframe):
+    dataframe = dataframe[dataframe.TermType == 'OnDemand']
+    dataframe = dataframe[dataframe.Tenancy == 'Shared']
+    dataframe = dataframe[dataframe['Operating System'] != 'Linux']
+    dataframe = dataframe[dataframe['License Model'] != 'Bring your own license']
+    dataframe = dataframe[dataframe['Pre Installed S/W'].isnull()]
+    return dataframe
+
+def removeMoreColumns(dataframe):
+    dataframe = dataframe.drop(['TermType', 'Tenancy', 'License Model', 'Pre Installed S/W', 'PriceDescription'],axis=1)
+    return dataframe
+
+lambda_handler()
