@@ -81,4 +81,53 @@ def removeMoreColumns(dataframe):
     dataframe = dataframe.drop(['TermType', 'Tenancy', 'License Model', 'Pre Installed S/W', 'PriceDescription'],axis=1)
     return dataframe
 
+def testInstances():
+    old = ['t4', 'y5','u6','lol']
+    present = ['t4','y5','u6','i7']
+    
+    newInstances = list(set(present) - set(old))
+    oldInstances = list(set(old) - set(present)) 
+    
+    print(newInstances)
+    print(oldInstances)
+    
+
+def findNewPrices(pastFile, currentFile):
+    pastInstanceList = pastFile['Instance Type'].tolist()
+    pastOsList = pastFile['Operating System'].tolist()
+    pastPriceList = pastFile['PricePerUnit'].tolist()
+
+    presentInstanceList = currentFile['Instance Type'].tolist()
+    presentOsList = currentFile['Operating System'].tolist()
+    presentPriceList = currentFile['PricePerUnit'].tolist()
+    
+    instanceDictPast = {}
+    instanceDictPresent = {}    
+    
+    #print(pastInstanceList)
+    #print(len(pastInstanceList))
+    
+    for i in range(len(pastInstanceList)):  
+        
+        #listToPrint.append(i)
+        instanceDictPast[pastInstanceList[i]+' '+pastOsList[i]] = pastPriceList[i]
+        instanceDictPresent[presentInstanceList[i]+' '+presentOsList[i]] = presentPriceList[i]
+    
+    differences = []
+ 
+    for key in instanceDictPast:
+        try:
+            if instanceDictPast[key] == instanceDictPresent[key]:
+                y = 4
+                
+            else:
+                instance, os = key.split(' ')
+                result = 'change= instance: ' + instance + ',' + ' OS: ' + os + ',' + ' new price: ' +'$'+ str(instanceDictPresent[key]) + ' per hour'
+                differences.append(result)
+        except:
+            print("New or deleted value")
+    
+    #print(differences)
+    return differences
+
 lambda_handler()
