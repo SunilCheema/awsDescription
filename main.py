@@ -21,6 +21,7 @@ def lambda_handler(event, context):
     dataframe = removeColumns(dataframe)
     dataframe2 = dataframe.copy()
     dataframe2.at[3398,'PricePerUnit'] = 300
+    dataframe2 = dataframe2.drop(dataframe2.index[20])
     print(dataframe2.head())
     differences = findNewPrices(dataframe, dataframe2)
     print(differences)
@@ -32,7 +33,6 @@ def lambda_handler(event, context):
 def download_file(url):
     fullfilename = os.path.join('/tmp', 'index.csv')
     urllib.urlretrieve(url, fullfilename)
-
 
 # Removes first 5 rows of the csv file that contains metadata
 def removeRows():
@@ -128,6 +128,7 @@ def findNewPrices(pastFile, currentFile):
     for i in range(len(pastInstanceList)):
         # listToPrint.append(i)
         instanceDictPast[pastInstanceList[i] + ' ' + pastOsList[i]] = pastPriceList[i]
+    for i in range(len(presentInstanceList)):
         instanceDictPresent[presentInstanceList[i] + ' ' + presentOsList[i]] = presentPriceList[i]
 
     differences = []
@@ -143,10 +144,15 @@ def findNewPrices(pastFile, currentFile):
                     instanceDictPresent[key]) + ' per hour'
                 differences.append(result)
         except:
-            print("New or deleted value")
-
+            differences.append("Deleted value " + key)
+            #print("New or deleted value")
+    for key in instanceDictPresent:
+        if key not in instanceDictPast:
+            differences.append("Added value " + key)
+    
     # print(differences)
     return differences
+
 
 #Sends an email with content as the body
 def email(content):
