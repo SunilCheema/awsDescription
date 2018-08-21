@@ -17,11 +17,11 @@ def lambda_handler(event, context):
     dataframe = pd.read_csv('/tmp/updated_test.csv')
     dataframe = swapColumns(dataframe)
     dataframe = sortByInstanceType(dataframe)
-    dataframe = removeColumns(dataframe)
     dataframe = removeData(dataframe)
-    dataframe = removeMoreColumns(dataframe)
+    dataframe = removeColumns(dataframe)
     dataframe2 = dataframe.copy()
     dataframe2.at[3398,'PricePerUnit'] = 300
+    dataframe2 = dataframe2.drop(dataframe2.index[20])
     print(dataframe2.head())
     differences = findNewPrices(dataframe, dataframe2)
     print(differences)
@@ -29,13 +29,12 @@ def lambda_handler(event, context):
 
     return ' '
 
-
+#downloads spreadsheet containing AWS EC2 description
 def download_file(url):
     fullfilename = os.path.join('/tmp', 'index.csv')
     urllib.urlretrieve(url, fullfilename)
 
-
-# Removes first 5 rows of the csv file
+# Removes first 5 rows of the csv file that contains metadata
 def removeRows():
     with open("/tmp/index.csv", 'r') as f:
         with open("/tmp/updated_test.csv", 'w') as f1:
@@ -45,7 +44,7 @@ def removeRows():
             for line in f:
                 f1.write(line)
 
-
+#Make instance type the first column in spreadsheet
 def swapColumns(dataframe):
     cols = dataframe.columns.tolist()
     print(cols)
@@ -54,13 +53,13 @@ def swapColumns(dataframe):
     dataframe = dataframe[cols]
     return dataframe
 
-
+#order the columns by instance type
 def sortByInstanceType(dataframe):
     dataframe = dataframe.sort_values(by=['Instance Type'])
 
     return dataframe
 
-
+#store the latest csv somewhere temporary (file.io)
 def storeFile():
     url = 'https://file.io/?expires=1w'
     files = {'file': open('/tmp/out.csv', 'rb')}
@@ -70,9 +69,9 @@ def storeFile():
     d = json.loads(r.content)
     link = d['link']
 
-    print(link)
+    return link
 
-
+#remove unnecssecary columns
 def removeColumns(dataframe):
     dataframe = dataframe.drop(
         ['SKU', 'OfferTermCode', 'RateCode', 'EffectiveDate', 'StartingRange', 'EndingRange', 'LeaseContractLength',
@@ -87,10 +86,11 @@ def removeColumns(dataframe):
          'Instance Capacity - 32xlarge', 'Instance Capacity - 4xlarge', 'Instance Capacity - 8xlarge',
          'Instance Capacity - 9xlarge', 'Instance Capacity - large', 'Instance Capacity - medium',
          'Instance Capacity - xlarge', 'Intel AVX Available', 'Intel AVX2 Available', 'Intel Turbo Available',
-         'Normalization Size Factor', 'Physical Cores', 'Processor Features', 'serviceName'], axis=1)
+         'Normalization Size Factor', 'Physical Cores', 'Processor Features', 'serviceName',
+         'TermType', 'Tenancy', 'License Model', 'Pre Installed S/W', 'PriceDescription'], axis=1)
     return dataframe
 
-
+#Remove irrelevant rows
 def removeData(dataframe):
     dataframe = dataframe[dataframe.TermType == 'OnDemand']
     dataframe = dataframe[dataframe.Tenancy == 'Shared']
@@ -98,13 +98,6 @@ def removeData(dataframe):
     dataframe = dataframe[dataframe['License Model'] != 'Bring your own license']
     dataframe = dataframe[dataframe['Pre Installed S/W'].isnull()]
     return dataframe
-
-
-def removeMoreColumns(dataframe):
-    dataframe = dataframe.drop(['TermType', 'Tenancy', 'License Model', 'Pre Installed S/W', 'PriceDescription'],
-                               axis=1)
-    return dataframe
-
 
 def testInstances():
     old = ['t4', 'y5', 'u6', 'lol']
@@ -116,7 +109,7 @@ def testInstances():
     print(newInstances)
     print(oldInstances)
 
-
+#Find price change between two csv
 def findNewPrices(pastFile, currentFile):
     pastInstanceList = pastFile['Instance Type'].tolist()
     pastOsList = pastFile['Operating System'].tolist()
@@ -135,6 +128,7 @@ def findNewPrices(pastFile, currentFile):
     for i in range(len(pastInstanceList)):
         # listToPrint.append(i)
         instanceDictPast[pastInstanceList[i] + ' ' + pastOsList[i]] = pastPriceList[i]
+    for i in range(len(presentInstanceList)):
         instanceDictPresent[presentInstanceList[i] + ' ' + presentOsList[i]] = presentPriceList[i]
 
     differences = []
@@ -150,12 +144,17 @@ def findNewPrices(pastFile, currentFile):
                     instanceDictPresent[key]) + ' per hour'
                 differences.append(result)
         except:
-            print("New or deleted value")
-
+            differences.append("Deleted value " + key)
+            #print("New or deleted value")
+    for key in instanceDictPresent:
+        if key not in instanceDictPast:
+            differences.append("Added value " + key)
+    
     # print(differences)
     return differences
 
 
+#Sends an email with content as the body
 def email(content):
     SENDER = "samueltkooy@gmail.com"
     RECIPIENT = "samueltkooy@gmail.com"
