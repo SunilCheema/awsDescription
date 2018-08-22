@@ -19,12 +19,27 @@ def lambda_handler(event, context):
     dataframe = sortByInstanceType(dataframe)
     dataframe = removeData(dataframe)
     dataframe = removeColumns(dataframe)
-    dataframe2 = dataframe.copy()
-    dataframe2.at[3398,'PricePerUnit'] = 300
-    dataframe2 = dataframe2.drop(dataframe2.index[20])
-    print(dataframe2.head())
-    differences = findNewPrices(dataframe, dataframe2)
-    print(differences)
+    dataframe.to_csv('/tmp/outNew.csv', index=False)
+    
+    link = storeFile()
+    print('link =' + link)
+    downloadResult = downloadStoredFile(link)
+    print('downloadedResult method result = '+ downloadResult)
+    
+    
+    oldDataframe = pd.read_csv('/tmp/downloaded.csv')
+    
+    #print('could not get downloaded csv')
+    difference = handleEvents(oldDataframe,dataframe)
+    #print(difference)
+    storeEnvVariable(link)
+        
+    #dataframe2 = dataframe.copy()
+    #dataframe2.at[3398,'PricePerUnit'] = 300
+    #dataframe2 = dataframe2.drop(dataframe2.index[20])
+    #print(dataframe2.head())
+    #differences = findNewPrices(dataframe, dataframe2)
+    #print(differences)
     dataframe.to_csv('/tmp/outNew.csv', index=False)
 
     return ' '
@@ -34,6 +49,16 @@ def download_file(url):
     fullfilename = os.path.join('/tmp', 'index.csv')
     urllib.urlretrieve(url, fullfilename)
 
+def download_file2(url):
+    local_filename = '/tmp/downloaded.csv'
+    # NOTE the stream=True parameter
+    r = requests.get(url, stream=True)
+    with open(local_filename, 'wb') as f:
+        for chunk in r.iter_content(chunk_size=1024):
+            if chunk: # filter out keep-alive new chunks
+                f.write(chunk)
+                #f.flush() commented by recommendation from J.F.Sebastian
+    return local_filename
 # Removes first 5 rows of the csv file that contains metadata
 def removeRows():
     with open("/tmp/index.csv", 'r') as f:
@@ -47,7 +72,7 @@ def removeRows():
 #Make instance type the first column in spreadsheet
 def swapColumns(dataframe):
     cols = dataframe.columns.tolist()
-    print(cols)
+    
     a, b = cols.index('SKU'), cols.index('Instance Type')
     cols[b], cols[a] = cols[a], cols[b]
     dataframe = dataframe[cols]
@@ -62,7 +87,7 @@ def sortByInstanceType(dataframe):
 #store the latest csv somewhere temporary (file.io)
 def storeFile():
     url = 'https://file.io/?expires=1w'
-    files = {'file': open('/tmp/out.csv', 'rb')}
+    files = {'file': open('/tmp/outNew.csv', 'rb')}
     r = requests.post(url, files=files)
 
     # retrieve link
@@ -70,6 +95,28 @@ def storeFile():
     link = d['link']
 
     return link
+    
+def downloadStoredFile(link):
+    
+    if os.environ["fileKey"] == 4:
+        return 'no detection possible, env variable reset (dwnstored file)'
+    else:
+        fullfilename = os.path.join('/tmp', 'downloaded.csv')
+        urllib.urlretrieve(link, fullfilename)
+        return 'attempted download using file.io'
+
+def storeEnvVariable(link):
+    try:
+        os.environ["fileKey"] = link
+    except:
+        print('Failed attempt at storing link')
+        
+def handleEvents(oldFile, newFile):
+    if os.environ["fileKey"] == 4:
+        print('env variable reset (handleEvents')
+    else:
+        differences = findNewPrices(oldFile, newFile)
+        return differences 
 
 #remove unnecssecary columns
 def removeColumns(dataframe):
@@ -135,7 +182,8 @@ def findNewPrices(pastFile, currentFile):
 
     for key in instanceDictPast:
         try:
-            if instanceDictPast[key] == instanceDictPresent[key]:
+            if abs(instanceDictPast[key]-instanceDictPresent[key])<0.00000001:
+            #if float(instanceDictPast[key]) == float(instanceDictPresent[key]):
                 y = 4
 
             else:
@@ -143,6 +191,9 @@ def findNewPrices(pastFile, currentFile):
                 result = 'change= instance: ' + instance + ',' + ' OS: ' + os + ',' + ' new price: ' + '$' + str(
                     instanceDictPresent[key]) + ' per hour'
                 differences.append(result)
+                print('past: '+str(instanceDictPast[key]))
+                print('current: '+str(instanceDictPresent[key]))
+                print(abs(instanceDictPast[key]-instanceDictPresent[key])<0.00000001)
         except:
             differences.append("Deleted value " + key)
             #print("New or deleted value")
@@ -225,4 +276,3 @@ def email(content):
     else:
         print("Email sent! Message ID:"),
         print(response['MessageId'])
-    
