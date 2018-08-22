@@ -31,8 +31,6 @@ def lambda_handler(event, context):
     
     #print('could not get downloaded csv')
     difference = handleEvents(oldDataframe,dataframe)
-    print(formatEmail(difference))
-    difference = ["cslvcxz","clkjzj", "cc vdsa"]
     email(difference)
     storeEnvVariable(link)
         
@@ -209,7 +207,7 @@ def findNewPrices(pastFile, currentFile):
 
 #Sends an email with content as the body
 def email(content):
-    content = formatEmail(content)
+    content = formatHTML(content)
     SENDER = "samueltkooy@gmail.com"
     RECIPIENT = "samueltkooy@gmail.com"
     
