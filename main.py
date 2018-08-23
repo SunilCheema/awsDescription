@@ -207,9 +207,8 @@ def findNewPrices(pastFile, currentFile):
 
 #Sends an email with content as the body
 def email(content):
-    content = formatHTML(content)
-    SENDER = "samueltkooy@gmail.com"
-    RECIPIENT = "samueltkooy@gmail.com"
+    SENDER = "sunil03cheema@hotmail.co.uk"
+    RECIPIENT = "sunil03cheema@hotmail.co.uk"
     
     # Specify a configuration set. If you do not want to use a configuration
     # set, comment the following variable, and the 
