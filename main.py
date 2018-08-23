@@ -31,7 +31,7 @@ def lambda_handler(event, context):
     
     #print('could not get downloaded csv')
     difference = handleEvents(oldDataframe,dataframe)
-    #print(difference)
+    email(difference)
     storeEnvVariable(link)
         
     #dataframe2 = dataframe.copy()
@@ -276,3 +276,13 @@ def email(content):
     else:
         print("Email sent! Message ID:"),
         print(response['MessageId'])
+        
+        
+#add HTML line breaks to 
+def formatHTML(differences):
+    body =  ""
+    for dif in differences:
+        body += dif + '<br>' 
+    return body 
+        
+        
