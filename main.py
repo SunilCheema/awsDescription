@@ -14,6 +14,7 @@ from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 import boto3
 from botocore.exceptions import ClientError
+from tabulate import tabulate
 
 def lambda_handler(event, context):
     
@@ -45,18 +46,18 @@ def lambda_handler(event, context):
     oldDataframe = pd.read_csv('/tmp/downloaded.csv')
     dataframe = dataframe.reset_index()
     oldDataframe = oldDataframe.reset_index()
-    #print('could not get downloaded csv')
-    #print(dataframe.head(3))
-    #oldDataframe.at[0,'PricePerUnit'] = 300
     dataframe = dataframe.drop(oldDataframe.index[0])
-    #print(dataframe.head(3))
-    
     difference, deleted, changedPrice, newInstances = handleEvents(oldDataframe,dataframe)
     print(difference)
     
     deleted.to_csv('/tmp/deleted.csv', index=False)
     
+    allDataframes = [deleted, changedPrice, newInstances]
+    for frame in allDataframes:
+        if frame.shape[0] != 0:
+            print('lol')
     
+    #if deleted != 0 push through array of strings equal to the values in the dataframe
     #email(difference)
     
     
@@ -263,13 +264,50 @@ def email():
     msg.preamble = 'Multipart message.\n'
 
     # the message body
-    part = MIMEText('Recent EC2 changes')
-    msg.attach(part)
+    
+    #part = MIMEText('Recent EC2 changes')
+    #msg.attach(part)
+    
+    #if statement that attaches parts based on whether a variable is true
+    
+    text = """
+    Hello, Friend.
 
+    Here is your data:
+
+    {table}
+
+    Regards,
+
+    Me"""
+
+    html = """
+    <html><body><p>Hello, Friend.</p>
+    <p>Here is your data:</p>
+    <div style="font-size:11px">
+    {table}
+    </div>
+    <p>Regards,</p>
+    <p>Me</p>
+    </body></html>
+    """
+
+    with open('/tmp/deleted.csv') as input_file:
+        reader = csv.reader(input_file)
+        data = list(reader)
+
+    text = text.format(table=tabulate(data, headers="firstrow", tablefmt="grid"))
+    html = html.format(table=tabulate(data, headers="firstrow", tablefmt="html"))
+    #html = html.format(table=data)
+    #msg.attach(MIMEText(text))
+    msg.attach(MIMEText(html,'html'))
+    msg.attach(MIMEText('lol'))
+    
     # the attachment
     part = MIMEApplication(open('/tmp/deleted.csv', 'rb').read())
     part.add_header('Content-Disposition', 'attachment', filename='removed_instances.csv')
     msg.attach(part)
+    
     
     result = ses.send_raw_email(RawMessage={
                        'Data': msg.as_string(),
