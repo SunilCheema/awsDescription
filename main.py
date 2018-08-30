@@ -9,11 +9,9 @@ import csv
 import pickle
 from itertools import islice
 from collections import OrderedDict
-
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
-
 import boto3
 from botocore.exceptions import ClientError
 
@@ -29,43 +27,40 @@ def lambda_handler(event, context):
     dataframe.to_csv('/tmp/outNew.csv', index=False)
     
     link = storeFile()
-    print('link =' + link)
-    fileioUrl = 'https://file.io/'
-    print("the fileKey is below")
-    print(os.environ["fileKey"])
+    print('Latest link = ' + link)
+    print("the fileKey is: "+ os.environ["fileKey"])
+    
     downloadResult = 'none'
     if os.environ["fileKey"] == '4':
-        storeEnvVariable2(link)
-        print('equal to 4 ')
+        storeEnvVariable(link)
         return 'env variable reset'
-        #downloadResult = downloadStoredFile(fileioUrl + os.environ["fileKey"])
+        
     else:
         downloadResult = downloadStoredFile(os.environ["fileKey"])
         print('not equal to 4 ')
     
     print('downloadedResult method result = '+ downloadResult)
     
-    storeEnvVariable2(link)
+    storeEnvVariable(link)
     oldDataframe = pd.read_csv('/tmp/downloaded.csv')
     dataframe = dataframe.reset_index()
     oldDataframe = oldDataframe.reset_index()
     #print('could not get downloaded csv')
     #print(dataframe.head(3))
     #oldDataframe.at[0,'PricePerUnit'] = 300
-    dataframe = dataframe.drop(oldDataframe.index[18])
+    dataframe = dataframe.drop(oldDataframe.index[0])
     #print(dataframe.head(3))
     
     difference, deleted, changedPrice, newInstances = handleEvents(oldDataframe,dataframe)
-    print(deleted)
     print(difference)
     
     deleted.to_csv('/tmp/deleted.csv', index=False)
-    #storeEnvVariable2(link)
+    
     
     #email(difference)
     
     
-    email2()
+    email()
     #dataframe2 = dataframe.copy()
     #dataframe2.at[3398,'PricePerUnit'] = 300
     #dataframe2 = dataframe2.drop(dataframe2.index[20])
@@ -91,6 +86,7 @@ def download_file2(url):
                 f.write(chunk)
                 #f.flush() commented by recommendation from J.F.Sebastian
     return local_filename
+    
 # Removes first 5 rows of the csv file that contains metadata
 def removeRows():
     with open("/tmp/index.csv", 'r') as f:
@@ -136,12 +132,6 @@ def downloadStoredFile(link):
         fullfilename = os.path.join('/tmp', 'downloaded.csv')
         urllib.urlretrieve(link, fullfilename)
         return 'attempted download using file.io'
-
-def storeEnvVariable(link):
-    try:
-        os.environ["fileKey"] = link
-    except:
-        print('Failed attempt at storing link')
         
 def handleEvents(oldFile, newFile):
     if os.environ["fileKey"] == 4:
@@ -177,16 +167,6 @@ def removeData(dataframe):
     dataframe = dataframe[dataframe['License Model'] != 'Bring your own license']
     dataframe = dataframe[dataframe['Pre Installed S/W'].isnull()]
     return dataframe
-
-def testInstances():
-    old = ['t4', 'y5', 'u6', 'lol']
-    present = ['t4', 'y5', 'u6', 'i7']
-
-    newInstances = list(set(present) - set(old))
-    oldInstances = list(set(old) - set(present))
-
-    print(newInstances)
-    print(oldInstances)
 
 #Find price change between two csv
 def findNewPrices(pastFile, currentFile):
@@ -238,6 +218,7 @@ def findNewPrices(pastFile, currentFile):
         except:
             differences.append("Deleted value " + key)
             #print(list(islice(instanceDictPast, 10)))
+            print(pastFile.head(3))
             deletedValueRow = pastFile.iloc[indexPast]
             
             ilocIndex = len(deletedValuesFrame.index)
@@ -260,79 +241,7 @@ def findNewPrices(pastFile, currentFile):
     return differences, deletedValuesFrame, changedPricesFrame, newInstancesFrame
 
 
-#Sends an email with content as the body
-def email(content):
-    SENDER = "sunil03cheema@hotmail.co.uk"
-    RECIPIENT = "sunil03cheema@hotmail.co.uk"
-    
-    # Specify a configuration set. If you do not want to use a configuration
-    # set, comment the following variable, and the 
-    # ConfigurationSetName=CONFIGURATION_SET argument below.
-    #CONFIGURATION_SET = "ConfigSet"
-    
-    # If necessary, replace us-west-2 with the AWS Region you're using for Amazon SES.
-    AWS_REGION = "eu-west-1"
-    
-    # The subject line for the email.
-    SUBJECT = "Amazon EC2 status change alert"
-    
-    # The email body for recipients with non-HTML email clients.
-    BODY_TEXT = ("Check for latest changes to EC2 instances")
-                
-    # The HTML body of the email.
-    BODY_HTML = """<html>
-    <head></head>
-    <body>
-      <h1>Latest changes to EC2 instances</h1>
-      <p>{content}</p>
-    </body>
-    </html>
-                """.format(content=content)            
-    
-    # The character encoding for the email.
-    CHARSET = "UTF-8"
-    
-    # Create a new SES resource and specify a region.
-    client = boto3.client('ses',region_name=AWS_REGION)
-    
-    # Try to send the email.
-    try:
-        #Provide the contents of the email.
-        response = client.send_email(
-            Destination={
-                'ToAddresses': [
-                    RECIPIENT,
-                ],
-            },
-            Message={
-                'Body': {
-                    'Html': {
-                        'Charset': CHARSET,
-                        'Data': BODY_HTML,
-                    },
-                    'Text': {
-                        'Charset': CHARSET,
-                        'Data': BODY_TEXT,
-                    },
-                },
-                'Subject': {
-                    'Charset': CHARSET,
-                    'Data': SUBJECT,
-                },
-            },
-            Source=SENDER,
-            # If you are not using a configuration set, comment or delete the
-            # following line
-            #ConfigurationSetName=CONFIGURATION_SET,
-        )
-    # Display an error if something goes wrong.	
-    except ClientError as e:
-        print(e.response['Error']['Message'])
-    else:
-        print("Email sent! Message ID:"),
-        print(response['MessageId'])
-
-def storeEnvVariable2(link):
+def storeEnvVariable(link):
     client = boto3.client('lambda')
     response = client.update_function_configuration(
             FunctionName='cloud9-awsDescription2-awsDescription2-6G7KIDQALZ4Y',
@@ -343,7 +252,7 @@ def storeEnvVariable2(link):
             }
         )
 
-def email2():
+def email():
     ses = boto3.client('ses')
     msg = MIMEMultipart()
     msg['Subject'] = 'weekly report'
@@ -354,7 +263,7 @@ def email2():
     msg.preamble = 'Multipart message.\n'
 
     # the message body
-    part = MIMEText('Howdy -- here is the data from last week.')
+    part = MIMEText('Recent EC2 changes')
     msg.attach(part)
 
     # the attachment
@@ -368,12 +277,3 @@ def email2():
                    Source=msg['From'], 
                    Destinations=['sunil03cheema@hotmail.co.uk']
                    )
-    '''
-    result = ses.send_raw_email(
-    Source=msg['From'],
-    Destinations=msg['To'],
-    RawMessage={'Data': msg.as_string()}
-)                                  
-'''
-
-#RawMessage=msg
