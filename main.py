@@ -55,21 +55,24 @@ def lambda_handler(event, context):
     dataframe = dataframe.drop(oldDataframe.index[18])
     #print(dataframe.head(3))
     
-    difference = handleEvents(oldDataframe,dataframe)
+    difference, deleted, changedPrice, newInstances = handleEvents(oldDataframe,dataframe)
+    print(deleted)
     print(difference)
+    
+    deleted.to_csv('/tmp/deleted.csv', index=False)
     #storeEnvVariable2(link)
     
     #email(difference)
     
     
-    #email2()
+    email2()
     #dataframe2 = dataframe.copy()
     #dataframe2.at[3398,'PricePerUnit'] = 300
     #dataframe2 = dataframe2.drop(dataframe2.index[20])
     #print(dataframe2.head())
     #differences = findNewPrices(dataframe, dataframe2)
     #print(differences)
-    dataframe.to_csv('/tmp/outNew.csv', index=False)
+    #dataframe.to_csv('/tmp/outNew.csv', index=False)
     
     return ' '
 
@@ -144,8 +147,8 @@ def handleEvents(oldFile, newFile):
     if os.environ["fileKey"] == 4:
         print('env variable reset (handleEvents')
     else:
-        differences = findNewPrices(oldFile, newFile)
-        return differences 
+        differences, deleted, changedPrice, newInstances = findNewPrices(oldFile, newFile)
+        return differences, deleted, changedPrice, newInstances 
 
 #remove unnecssecary columns
 def removeColumns(dataframe):
@@ -210,6 +213,10 @@ def findNewPrices(pastFile, currentFile):
     differences = []
     indexPast = -1
     indexCurrent = -1
+    colNames = list(pastFile.columns.values)
+    deletedValuesFrame = pd.DataFrame(columns = colNames)
+    changedPricesFrame = pd.DataFrame(columns = colNames)
+    newInstancesFrame = pd.DataFrame(columns = colNames)
     
     for key in instanceDictPast:
         indexPast += 1
@@ -226,11 +233,19 @@ def findNewPrices(pastFile, currentFile):
                 print('past: '+str(instanceDictPast[key]))
                 print('current: '+str(instanceDictPresent[key]))
                 print(abs(instanceDictPast[key]-instanceDictPresent[key])<0.00000001)
+                differentPriceRow = currentFile.iloc[indexPast]
+                changedPricesFrame = changedPricesFrame.append(differentPriceRow)
         except:
             differences.append("Deleted value " + key)
             #print(list(islice(instanceDictPast, 10)))
             deletedValueRow = pastFile.iloc[indexPast]
-            print(deletedValueRow)
+            
+            ilocIndex = len(deletedValuesFrame.index)
+            deletedValuesFrame = deletedValuesFrame.append(deletedValueRow)
+            
+            #deletedValuesFrame.iloc[ilocIndex+1] = deletedValueRow
+            #print(deletedValuesFrame)
+            #print(deletedValueRow)
             #print(pastInstanceList[1])
             #print(deletedValuesDataframe)
             #print(deletedValueDatafram)
@@ -239,9 +254,10 @@ def findNewPrices(pastFile, currentFile):
         indexCurrent += 1
         if key not in instanceDictPast:
             differences.append("Added value " + key)
-    
+            newValueRow = currentFile.iloc[indexCurrent]
+            newInstancesFrame = newInstancesFrame.append(newValueRow)
     # print(differences)
-    return differences
+    return differences, deletedValuesFrame, changedPricesFrame, newInstancesFrame
 
 
 #Sends an email with content as the body
@@ -342,12 +358,22 @@ def email2():
     msg.attach(part)
 
     # the attachment
-    part = MIMEApplication(open('/tmp/updated_test.csv', 'rb').read())
-    part.add_header('Content-Disposition', 'attachment', filename='/tmp/updated_test.csv')
+    part = MIMEApplication(open('/tmp/deleted.csv', 'rb').read())
+    part.add_header('Content-Disposition', 'attachment', filename='removed_instances.csv')
     msg.attach(part)
-
+    
+    result = ses.send_raw_email(RawMessage={
+                       'Data': msg.as_string(),
+                   }, 
+                   Source=msg['From'], 
+                   Destinations=['sunil03cheema@hotmail.co.uk']
+                   )
+    '''
     result = ses.send_raw_email(
     Source=msg['From'],
     Destinations=msg['To'],
-    RawMessage=msg
+    RawMessage={'Data': msg.as_string()}
 )                                  
+'''
+
+#RawMessage=msg
