@@ -17,8 +17,13 @@ from botocore.exceptions import ClientError
 from tabulate import tabulate
 
 def lambda_handler(event, context):
-    
-    download_file('https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-west-1/index.csv')
+    awsUrl = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-west-1/index.csv'
+    environmentVariable = "fileKey"
+    irelandResults = findDifferences(awsUrl, environmentVariable)
+    return ' '
+
+def findDifferences(awsUrl, environmentVariable):
+    download_file(awsUrl)
     removeRows()
     dataframe = pd.read_csv('/tmp/updated_test.csv')
     dataframe = swapColumns(dataframe)
@@ -29,15 +34,15 @@ def lambda_handler(event, context):
     
     link = storeFile()
     print('Latest link = ' + link)
-    print("the fileKey is: "+ os.environ["fileKey"])
+    print("the fileKey is: "+ os.environ[environmentVariable])
     
     downloadResult = 'none'
-    if os.environ["fileKey"] == '4':
+    if os.environ[environmentVariable] == '4':
         storeEnvVariable(link)
         return 'env variable reset'
         
     else:
-        downloadResult = downloadStoredFile(os.environ["fileKey"])
+        downloadResult = downloadStoredFile(os.environ[environmentVariable])
         print('not equal to 4 ')
     
     print('downloadedResult method result = '+ downloadResult)
@@ -80,8 +85,11 @@ def lambda_handler(event, context):
     #print(differences)
     #dataframe.to_csv('/tmp/outNew.csv', index=False)
     
-    return ' '
-
+    os.remove("/tmp/downloaded.csv")
+    os.remove("/tmp/outNew.csv")
+    os.remove("/tmp/updated_test.csv")
+    return dataframesToReturn
+    
 #downloads spreadsheet containing AWS EC2 description
 def download_file(url):
     fullfilename = os.path.join('/tmp', 'index.csv')
