@@ -46,22 +46,32 @@ def lambda_handler(event, context):
     oldDataframe = pd.read_csv('/tmp/downloaded.csv')
     dataframe = dataframe.reset_index()
     oldDataframe = oldDataframe.reset_index()
-    dataframe = dataframe.drop(oldDataframe.index[0])
+    dataframe = dataframe.drop(dataframe.index[0])
+    oldDataframe = oldDataframe.drop(oldDataframe.index[7])
     difference, deleted, changedPrice, newInstances = handleEvents(oldDataframe,dataframe)
     print(difference)
     
+    deleted = deleted.drop('index', 1)
     deleted.to_csv('/tmp/deleted.csv', index=False)
     
     allDataframes = [deleted, changedPrice, newInstances]
+    dataframeNames = ['deleted added', 'changedPrice added', 'newInstances added']
+    dataframesToReturn = []
+    
+    index = -1
     for frame in allDataframes:
+        index += 1
         if frame.shape[0] != 0:
-            print('lol')
+            print(dataframeNames[index])
+            dataframesToReturn.append(frame)
     
     #if deleted != 0 push through array of strings equal to the values in the dataframe
     #email(difference)
     
     
-    email()
+    #email()
+    
+    
     #dataframe2 = dataframe.copy()
     #dataframe2.at[3398,'PricePerUnit'] = 300
     #dataframe2 = dataframe2.drop(dataframe2.index[20])
@@ -219,7 +229,7 @@ def findNewPrices(pastFile, currentFile):
         except:
             differences.append("Deleted value " + key)
             #print(list(islice(instanceDictPast, 10)))
-            print(pastFile.head(3))
+            #print(pastFile.head(3))
             deletedValueRow = pastFile.iloc[indexPast]
             
             ilocIndex = len(deletedValuesFrame.index)
@@ -295,13 +305,14 @@ def email():
     with open('/tmp/deleted.csv') as input_file:
         reader = csv.reader(input_file)
         data = list(reader)
-
+    
+    
     text = text.format(table=tabulate(data, headers="firstrow", tablefmt="grid"))
     html = html.format(table=tabulate(data, headers="firstrow", tablefmt="html"))
     #html = html.format(table=data)
     #msg.attach(MIMEText(text))
     msg.attach(MIMEText(html,'html'))
-    msg.attach(MIMEText('lol'))
+    #msg.attach(MIMEText('lol'))
     
     # the attachment
     part = MIMEApplication(open('/tmp/deleted.csv', 'rb').read())
