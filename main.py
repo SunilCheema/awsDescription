@@ -17,9 +17,9 @@ from botocore.exceptions import ClientError
 from tabulate import tabulate
 
 def lambda_handler(event, context):
-    awsUrl = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-west-1/index.csv'
-    environmentVariable = "fileKey"
-    irelandResults = findDifferences(awsUrl, environmentVariable)
+    awsUrlIreland = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-west-1/index.csv'
+    environmentVariableIreland = "fileKey"
+    irelandResults = findDifferences(awsUrlIreland, environmentVariableIreland)
     return ' '
 
 def findDifferences(awsUrl, environmentVariable):
@@ -38,22 +38,22 @@ def findDifferences(awsUrl, environmentVariable):
     
     downloadResult = 'none'
     if os.environ[environmentVariable] == '4':
-        storeEnvVariable(link)
+        storeEnvVariable(link, environmentVariable)
         return 'env variable reset'
         
     else:
-        downloadResult = downloadStoredFile(os.environ[environmentVariable])
+        downloadResult = downloadStoredFile(os.environ[environmentVariable],environmentVariable)
         print('not equal to 4 ')
     
     print('downloadedResult method result = '+ downloadResult)
     
-    storeEnvVariable(link)
+    storeEnvVariable(link, environmentVariable)
     oldDataframe = pd.read_csv('/tmp/downloaded.csv')
     dataframe = dataframe.reset_index()
     oldDataframe = oldDataframe.reset_index()
     dataframe = dataframe.drop(dataframe.index[0])
     oldDataframe = oldDataframe.drop(oldDataframe.index[7])
-    difference, deleted, changedPrice, newInstances = handleEvents(oldDataframe,dataframe)
+    difference, deleted, changedPrice, newInstances = handleEvents(oldDataframe,dataframe, environmentVariable)
     print(difference)
     
     deleted = deleted.drop('index', 1)
@@ -74,7 +74,7 @@ def findDifferences(awsUrl, environmentVariable):
     #email(difference)
     
     
-    #email()
+    email()
     
     
     #dataframe2 = dataframe.copy()
@@ -143,17 +143,17 @@ def storeFile():
 
     return link
     
-def downloadStoredFile(link):
+def downloadStoredFile(link, envVariable):
     
-    if os.environ["fileKey"] == 4:
+    if os.environ[envVariable] == 4:
         return 'no detection possible, env variable reset (dwnstored file)'
     else:
         fullfilename = os.path.join('/tmp', 'downloaded.csv')
         urllib.urlretrieve(link, fullfilename)
         return 'attempted download using file.io'
         
-def handleEvents(oldFile, newFile):
-    if os.environ["fileKey"] == 4:
+def handleEvents(oldFile, newFile, envVariable):
+    if os.environ[envVariable] == 4:
         print('env variable reset (handleEvents')
     else:
         differences, deleted, changedPrice, newInstances = findNewPrices(oldFile, newFile)
@@ -260,13 +260,13 @@ def findNewPrices(pastFile, currentFile):
     return differences, deletedValuesFrame, changedPricesFrame, newInstancesFrame
 
 
-def storeEnvVariable(link):
+def storeEnvVariable(link, envVariable):
     client = boto3.client('lambda')
     response = client.update_function_configuration(
             FunctionName='cloud9-awsDescription2-awsDescription2-6G7KIDQALZ4Y',
             Environment={
                 'Variables': {
-                    'fileKey': link
+                    envVariable: link
                 }
             }
         )
@@ -290,13 +290,9 @@ def email():
     
     text = """
     Hello, Friend.
-
     Here is your data:
-
     {table}
-
     Regards,
-
     Me"""
 
     html = """
