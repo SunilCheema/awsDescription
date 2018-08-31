@@ -16,10 +16,18 @@ import boto3
 from botocore.exceptions import ClientError
 from tabulate import tabulate
 
+IRELANDKEY = ''
+LONDONKEY = ''
+
 def lambda_handler(event, context):
+    
     awsUrlIreland = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-west-1/index.csv'
     environmentVariableIreland = "fileKey"
     irelandResults = findDifferences(awsUrlIreland, environmentVariableIreland)
+    
+    awsUrlLondon = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-west-2/index.csv'
+    environmentVariableLondon = "londonKey"
+    londonResults = findDifferences(awsUrlLondon, environmentVariableLondon)
     return ' '
 
 def findDifferences(awsUrl, environmentVariable):
