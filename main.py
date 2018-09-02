@@ -16,18 +16,33 @@ import boto3
 from botocore.exceptions import ClientError
 from tabulate import tabulate
 
-IRELANDKEY = ''
-LONDONKEY = ''
+IRELANDKEY = '4'
+LONDONKEY = '4'
 
 def lambda_handler(event, context):
     
-    awsUrlIreland = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-west-1/index.csv'
-    environmentVariableIreland = "fileKey"
-    irelandResults = findDifferences(awsUrlIreland, environmentVariableIreland)
+    try:
+        awsUrlIreland = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-west-1/index.csv'
+        environmentVariableIreland = "fileKey"
+        irelandResults = findDifferences(awsUrlIreland, environmentVariableIreland)
+    except:
+        print('failed Ireland')
     
-    awsUrlLondon = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-west-2/index.csv'
-    environmentVariableLondon = "londonKey"
-    londonResults = findDifferences(awsUrlLondon, environmentVariableLondon)
+    try:
+        awsUrlLondon = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-west-2/index.csv'
+        environmentVariableLondon = "londonKey"
+        londonResults = findDifferences(awsUrlLondon, environmentVariableLondon)
+    except:
+        print('failed London')
+        
+    try:
+        print('Irelend key: ' + IRELANDKEY)
+        print('London key: ' + LONDONKEY)
+        storeEnvVariable()
+    except:
+        print('failed to store variables')
+    
+    email()
     return ' '
 
 def findDifferences(awsUrl, environmentVariable):
@@ -44,9 +59,21 @@ def findDifferences(awsUrl, environmentVariable):
     print('Latest link = ' + link)
     print("the fileKey is: "+ os.environ[environmentVariable])
     
+    if awsUrl == 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-west-1/index.csv':
+        global IRELANDKEY
+        IRELANDKEY = link
+        print('IRELAND INVOKED')
+        print(IRELANDKEY)
+    else:
+        global LONDONKEY 
+        LONDONKEY = link
+        print('LONDON ENVOKED')
+        print(LONDONKEY)
+    
     downloadResult = 'none'
     if os.environ[environmentVariable] == '4':
-        storeEnvVariable(link, environmentVariable)
+        #storeEnvVariable(link, environmentVariable)
+        #storeEnvVariable()
         return 'env variable reset'
         
     else:
@@ -55,7 +82,8 @@ def findDifferences(awsUrl, environmentVariable):
     
     print('downloadedResult method result = '+ downloadResult)
     
-    storeEnvVariable(link, environmentVariable)
+    #storeEnvVariable()
+    #storeEnvVariable(link, environmentVariable)
     oldDataframe = pd.read_csv('/tmp/downloaded.csv')
     dataframe = dataframe.reset_index()
     oldDataframe = oldDataframe.reset_index()
@@ -82,7 +110,7 @@ def findDifferences(awsUrl, environmentVariable):
     #email(difference)
     
     
-    email()
+    #email()
     
     
     #dataframe2 = dataframe.copy()
@@ -96,6 +124,7 @@ def findDifferences(awsUrl, environmentVariable):
     os.remove("/tmp/downloaded.csv")
     os.remove("/tmp/outNew.csv")
     os.remove("/tmp/updated_test.csv")
+            
     return dataframesToReturn
     
 #downloads spreadsheet containing AWS EC2 description
@@ -268,13 +297,15 @@ def findNewPrices(pastFile, currentFile):
     return differences, deletedValuesFrame, changedPricesFrame, newInstancesFrame
 
 
-def storeEnvVariable(link, envVariable):
+def storeEnvVariable():
     client = boto3.client('lambda')
+    
     response = client.update_function_configuration(
             FunctionName='cloud9-awsDescription2-awsDescription2-6G7KIDQALZ4Y',
             Environment={
                 'Variables': {
-                    envVariable: link
+                    'fileKey': IRELANDKEY,
+                    'londonKey': LONDONKEY
                 }
             }
         )
