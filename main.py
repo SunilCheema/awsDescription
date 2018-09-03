@@ -18,7 +18,7 @@ from tabulate import tabulate
 
 IRELANDKEY = '4'
 LONDONKEY = '4'
-allDifferences= ''
+allDifferences= []
 
 def lambda_handler(event, context):
     
@@ -28,6 +28,7 @@ def lambda_handler(event, context):
         irelandResults = findDifferences(awsUrlIreland, environmentVariableIreland)
     except:
         print('failed Ireland')
+        
     
     try:
         awsUrlLondon = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/eu-west-2/index.csv'
@@ -59,6 +60,7 @@ def lambda_handler(event, context):
         for row in reader:
             writer.writerow(row[1:])
     #result.to_csv('/tmp/result.csv')
+    print(allDifferences)
     email()
     return ' '
 
@@ -108,7 +110,10 @@ def findDifferences(awsUrl, environmentVariable):
     oldDataframe = oldDataframe.drop(oldDataframe.index[7])
     difference, deleted, changedPrice, newInstances = handleEvents(oldDataframe,dataframe, environmentVariable)
     print(difference)
-
+    
+    global allDifferences
+    for dif in difference:
+        allDifferences.append(dif)
     
     deleted = deleted.drop('index', 1)
     deleted.to_csv('/tmp/deleted.csv', index=False)
@@ -290,7 +295,7 @@ def findNewPrices(pastFile, currentFile):
                 differentPriceRow = currentFile.iloc[indexPast]
                 changedPricesFrame = changedPricesFrame.append(differentPriceRow)
         except:
-            differences.append("Deleted value " + key)
+            differences.append("Deleted value: " + key)
             #print(list(islice(instanceDictPast, 10)))
             #print(pastFile.head(3))
             deletedValueRow = pastFile.iloc[indexPast]
@@ -308,7 +313,7 @@ def findNewPrices(pastFile, currentFile):
     for key in instanceDictPresent:
         indexCurrent += 1
         if key not in instanceDictPast:
-            differences.append("Added value " + key)
+            differences.append("Added value: " + key)
             newValueRow = currentFile.iloc[indexCurrent]
             newInstancesFrame = newInstancesFrame.append(newValueRow)
     # print(differences)
@@ -374,9 +379,19 @@ def email():
         reader = csv.reader(input_file)
         data = list(reader)
     
+    global allDifferences
+    print('allDifferences')
+   
+    commentResults = """ """
+    for dif in allDifferences:
+       commentResults += dif
+       commentResults += '<br>'
+
+    print(commentResults)
+    
     
     text = text.format(table=tabulate(data, headers="firstrow", tablefmt="grid"))
-    html = html.format(table=tabulate(data, headers="firstrow", tablefmt="html"), content = """ lol """)
+    html = html.format(table=tabulate(data, headers="firstrow", tablefmt="html"), content = commentResults)
     #html = html.format(content = ['first','second'])
     #html = html.format(table=data)
     #msg.attach(MIMEText(text))
@@ -385,7 +400,7 @@ def email():
     
     # the attachment
     part = MIMEApplication(open('/tmp/result2.csv', 'rb').read())
-    part.add_header('Content-Disposition', 'attachment', filename='removed_instances.csv')
+    part.add_header('Content-Disposition', 'attachment', filename='changed_instances.csv')
     msg.attach(part)
     
     
