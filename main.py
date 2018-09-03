@@ -18,6 +18,7 @@ from tabulate import tabulate
 
 IRELANDKEY = '4'
 LONDONKEY = '4'
+allDifferences= ''
 
 def lambda_handler(event, context):
     
@@ -42,6 +43,22 @@ def lambda_handler(event, context):
     except:
         print('failed to store variables')
     
+    combinedResults = irelandResults + londonResults
+    result = pd.concat(combinedResults, sort=False)
+    #result = result.drop('index',1)
+    result = result.drop('index',1)
+    #result = result.drop(' ',1)
+    result = result.drop(result.columns[1], axis=1)
+    
+    result.to_csv('/tmp/result.csv')
+    fname_in = '/tmp/result.csv'
+    fname_out = '/tmp/result2.csv'
+    with open(fname_in, 'rb') as fin, open(fname_out, 'wb') as fout:
+        reader = csv.reader(fin)
+        writer = csv.writer(fout)
+        for row in reader:
+            writer.writerow(row[1:])
+    #result.to_csv('/tmp/result.csv')
     email()
     return ' '
 
@@ -91,6 +108,7 @@ def findDifferences(awsUrl, environmentVariable):
     oldDataframe = oldDataframe.drop(oldDataframe.index[7])
     difference, deleted, changedPrice, newInstances = handleEvents(oldDataframe,dataframe, environmentVariable)
     print(difference)
+
     
     deleted = deleted.drop('index', 1)
     deleted.to_csv('/tmp/deleted.csv', index=False)
@@ -310,6 +328,12 @@ def storeEnvVariable():
             }
         )
 
+def emailList(differences):
+    result = """ """
+    for diff in differences:
+        result += result
+    return result
+
 def email():
     ses = boto3.client('ses')
     msg = MIMEMultipart()
@@ -337,6 +361,7 @@ def email():
     html = """
     <html><body><p>Hello, Friend.</p>
     <p>Here is your data:</p>
+    {content}
     <div style="font-size:11px">
     {table}
     </div>
@@ -345,20 +370,21 @@ def email():
     </body></html>
     """
 
-    with open('/tmp/deleted.csv') as input_file:
+    with open('/tmp/result2.csv') as input_file:
         reader = csv.reader(input_file)
         data = list(reader)
     
     
     text = text.format(table=tabulate(data, headers="firstrow", tablefmt="grid"))
-    html = html.format(table=tabulate(data, headers="firstrow", tablefmt="html"))
+    html = html.format(table=tabulate(data, headers="firstrow", tablefmt="html"), content = """ lol """)
+    #html = html.format(content = ['first','second'])
     #html = html.format(table=data)
     #msg.attach(MIMEText(text))
     msg.attach(MIMEText(html,'html'))
     #msg.attach(MIMEText('lol'))
     
     # the attachment
-    part = MIMEApplication(open('/tmp/deleted.csv', 'rb').read())
+    part = MIMEApplication(open('/tmp/result2.csv', 'rb').read())
     part.add_header('Content-Disposition', 'attachment', filename='removed_instances.csv')
     msg.attach(part)
     
